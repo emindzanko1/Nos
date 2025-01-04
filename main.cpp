@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cstdint>
 #include <bitset>
+#include <map>
 
 constexpr uint16_t VIDEO_MEMORY_START = 8192;
 constexpr uint16_t VIDEO_MEMORY_WIDTH = 80;
@@ -21,6 +22,13 @@ constexpr uint16_t INTERRUPT_INTERVAL_MS = 20;
 std::vector<uint16_t> memory(ROM_SIZE + VIDEO_MEMORY_WIDTH * VIDEO_MEMORY_HEIGHT, 0);
 std::vector<uint16_t> videoMemory(VIDEO_MEMORY_WIDTH *VIDEO_MEMORY_HEIGHT, 0);
 uint16_t keyboardInput = 0;
+
+std::map<char, uint16_t> asciiToSegment = {
+    {'A', 0b1110111}, {'B', 0b1111100}, {'C', 0b0111001}, {'D', 0b1011110},
+    {'E', 0b1111001}, {'F', 0b1110001}, {'0', 0b0111111}, {'1', 0b0000110},
+    {'2', 0b1011011}, {'3', 0b1001111}, {'4', 0b1100110}, {'5', 0b1101101},
+    {'6', 0b1111101}, {'7', 0b0000111}, {'8', 0b1111111}, {'9', 0b1101111},
+};
 
 void displayCharacter(uint16_t value)
 {
@@ -47,7 +55,14 @@ uint16_t readKeyboardInput()
     char key;
     std::cout << "Unesite znak: ";
     std::cin >> key;
-    return static_cast<uint16_t>(key);
+    if (asciiToSegment.find(key) != asciiToSegment.end())
+    {
+        return asciiToSegment[key];
+    }
+    else
+    {
+        return 0;
+    }
 }
 
 void handleDiskCommand(uint16_t command, uint16_t sectorNumber, uint16_t *data)
@@ -81,27 +96,6 @@ void handleDiskCommand(uint16_t command, uint16_t sectorNumber, uint16_t *data)
 
     diskFile.close();
 }
-
-/*void cpuLoop()
-{
-    int i = 0;
-    while (true)
-    {
-        uint16_t instruction = 0; // fetchInstruction();
-
-        // executeInstruction(instruction);
-
-        static auto lastInterrupt = std::chrono::steady_clock::now();
-        auto now = std::chrono::steady_clock::now();
-        if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastInterrupt).count() >= INTERRUPT_INTERVAL_MS)
-        {
-            std::cout << "Interapt signal generisan!" << ++i << std::endl;
-            lastInterrupt = now;
-        }
-
-        std::this_thread::sleep_for(std::chrono::nanoseconds(125));
-    }
-}*/
 
 void cpuLoop()
 {
@@ -150,79 +144,7 @@ int main()
 
     bootLoader();
 
-    while (true)
-    {
-        std::cout << "1. Prikazi video memoriju\n2. Unesi podatke sa tastature\n3. Upravljaj diskom\nIzbor: ";
-        int choice;
-        std::cin >> choice;
+    cpuLoop();
 
-        switch (choice)
-        {
-        case 1:
-            renderVideoMemory();
-            break;
-        case 2:
-            keyboardInput = readKeyboardInput();
-            memory[KEYBOARD_PORT] = keyboardInput;
-            std::cout << "Uneseni znak: " << static_cast<char>(keyboardInput) << std::endl;
-            break;
-        case 3:
-        {
-            uint16_t command, sectorNumber;
-            std::vector<uint16_t> buffer(DISK_SECTOR_SIZE, 0);
-            std::cout << "Unesite komandu (0-reset, 1-read, 2-write): ";
-            std::cin >> command;
-            std::cout << "Unesite sektor: ";
-            std::cin >> sectorNumber;
-            handleDiskCommand(command, sectorNumber, buffer.data());
-            break;
-        }
-        default:
-            std::cout << "Nepoznata opcija." << std::endl;
-        }
-
-        if (choice == 2)
-        {
-            std::thread cpuThread(cpuLoop);
-            cpuThread.detach();
-            break;
-        }
-    }
-
-    /* std::thread cpuThread(cpuLoop);
-
-   while (true)
-    {
-        std::cout << "1. Prikazi video memoriju\n2. Unesi podatke sa tastature\n3. Upravljaj diskom\nIzbor: ";
-        int choice;
-        std::cin >> choice;
-
-        switch (choice)
-        {
-        case 1:
-            renderVideoMemory();
-            break;
-        case 2:
-            keyboardInput = readKeyboardInput();
-            memory[KEYBOARD_PORT] = keyboardInput;
-            std::cout << "Uneseni znak: " << static_cast<char>(keyboardInput) << std::endl;
-            break;
-        case 3:
-        {
-            uint16_t command, sectorNumber;
-            std::vector<uint16_t> buffer(DISK_SECTOR_SIZE, 0);
-            std::cout << "Unesite komandu (0-reset, 1-read, 2-write): ";
-            std::cin >> command;
-            std::cout << "Unesite sektor: ";
-            std::cin >> sectorNumber;
-            handleDiskCommand(command, sectorNumber, buffer.data());
-            break;
-        }
-        default:
-            std::cout << "Nepoznata opcija." << std::endl;
-        }
-    }
-
-    cpuThread.join();*/
     return 0;
 }
