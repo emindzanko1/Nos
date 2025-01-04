@@ -24,10 +24,22 @@ std::vector<uint16_t> videoMemory(VIDEO_MEMORY_WIDTH *VIDEO_MEMORY_HEIGHT, 0);
 uint16_t keyboardInput = 0;
 
 std::map<char, uint16_t> asciiToSegment = {
-    {'A', 0b1110111}, {'B', 0b1111100}, {'C', 0b0111001}, {'D', 0b1011110},
-    {'E', 0b1111001}, {'F', 0b1110001}, {'0', 0b0111111}, {'1', 0b0000110},
-    {'2', 0b1011011}, {'3', 0b1001111}, {'4', 0b1100110}, {'5', 0b1101101},
-    {'6', 0b1111101}, {'7', 0b0000111}, {'8', 0b1111111}, {'9', 0b1101111},
+    {'A', 0b1110111},
+    {'B', 0b1111100},
+    {'C', 0b0111001},
+    {'D', 0b1011110},
+    {'E', 0b1111001},
+    {'F', 0b1110001},
+    {'0', 0b0111111},
+    {'1', 0b0000110},
+    {'2', 0b1011011},
+    {'3', 0b1001111},
+    {'4', 0b1100110},
+    {'5', 0b1101101},
+    {'6', 0b1111101},
+    {'7', 0b0000111},
+    {'8', 0b1111111},
+    {'9', 0b1101111},
 };
 
 void displayCharacter(uint16_t value)
@@ -99,24 +111,38 @@ void handleDiskCommand(uint16_t command, uint16_t sectorNumber, uint16_t *data)
 
 void cpuLoop()
 {
-    int i = 0;
+    int cursor = 0;
     auto startTime = std::chrono::steady_clock::now();
 
     while (true)
     {
-
         auto now = std::chrono::steady_clock::now();
-        if (std::chrono::duration_cast<std::chrono::seconds>(now - startTime).count() >= 5)
+        if (std::chrono::duration_cast<std::chrono::seconds>(now - startTime).count() >= 20)
             break;
 
         static auto lastInterrupt = std::chrono::steady_clock::now();
         if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastInterrupt).count() >= INTERRUPT_INTERVAL_MS)
         {
-            std::cout << "Interapt signal generisan! " << ++i << std::endl;
+            std::cout << "Generisan interapt signal!" << std::endl;
+
+            uint16_t character = readKeyboardInput();
+
+            if (cursor < VIDEO_MEMORY_WIDTH * VIDEO_MEMORY_HEIGHT)
+            {
+                memory[VIDEO_MEMORY_START + cursor] = character;
+                cursor++;
+            }
+            else
+            {
+                cursor = 0;
+            }
+
+            renderVideoMemory();
+
             lastInterrupt = now;
         }
 
-        std::this_thread::sleep_for(std::chrono::nanoseconds(125));
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 }
 
@@ -133,6 +159,52 @@ void bootLoader()
     {
         std::cerr << "Greska: Nije moguce ucitati OS sa diska!" << std::endl;
     }
+}
+
+void
+
+    void
+    testDisplayCharacter()
+{
+    displayCharacter(0b1111111);
+    displayCharacter(0b0111111);
+    displayCharacter(0b0000110);
+}
+
+void testRenderVideoMemory()
+{
+    memory[VIDEO_MEMORY_START + 0] = asciiToSegment['A'];
+    memory[VIDEO_MEMORY_START + 1] = asciiToSegment['B'];
+}
+
+void testReadKeyboardInput()
+{
+    uint16_t character = readKeyboardInput();
+    displayCharacter(character);
+}
+
+void testHandleDiskCommand()
+{
+    uint16_t dataToWrite[DISK_SECTOR_SIZE] = {asciiToSegment['C'], asciiToSegment['D']};
+    uint16_t dataToRead[DISK_SECTOR_SIZE] = {0};
+
+    handleDiskCommand(2, 0, dataToWrite);
+    handleDiskCommand(1, 0, dataToRead);
+
+    displayCharacter(dataToRead[0]);
+    displayCharacter(dataToRead[1]);
+}
+
+void testGeneral()
+{
+    // 1) rucni upis asciiToSegment['E'] u disk.img: i onda
+    std::ofstream diskFile("disk.img", std::ios::binary | std::ios::out);
+    std::vector<uint16_t> osData(ROM_SIZE, asciiToSegment['E']);
+    diskFile.write(reinterpret_cast<char *>(osData.data()), osData.size() * sizeof(uint16_t));
+    diskFile.close();
+    // 2) zatim testiraj bootLoader:
+    bootLoader();
+    renderVideoMemory();
 }
 
 int main()
